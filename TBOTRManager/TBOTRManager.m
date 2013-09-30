@@ -844,7 +844,7 @@ static OtrlMessageAppOps ui_ops = {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)encodeMessage:(NSString *)message
+- (NSString *)encodeMessage:(NSString *)message
             recipient:(NSString *)recipient
           accountName:(NSString *)accountName
              protocol:(NSString *)protocol {
@@ -877,6 +877,8 @@ static OtrlMessageAppOps ui_ops = {
   
   NSLog(@"-- org message : %@", message);
   NSLog(@"-- encrypted message : %@", newMessage);
+  
+  return newMessage;
 }
 
 
