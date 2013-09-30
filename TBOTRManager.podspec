@@ -13,6 +13,6 @@ Pod::Spec.new do |s|
   s.requires_arc = true
 
   #s.public_header_files = 'TBOTRManager/*.h'
-  #spec.source_files = "Classes/**/*.{h,m}"
-  spec.source_files = "TBOTRManager/**/*.{h,m}"
+  #s.source_files = "Classes/**/*.{h,m}"
+  s.source_files = "TBOTRManager/**/*.{h,m}"
 end
