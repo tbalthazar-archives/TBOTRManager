@@ -8,6 +8,15 @@
 
 #import <Foundation/Foundation.h>
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
 @interface TBOTRManager : NSObject
+
++ (TBOTRManager *)sharedOTRManager;
+
+- (void)requestOTRSessionWithAccount:(NSString *)account;
+- (void)encodeMessage:(NSString *)message
+            recipient:(NSString *)recipient
+          accountName:(NSString *)accountName
+             protocol:(NSString *)protocol;
 
 @end
