@@ -12,4 +12,5 @@ Pod::Spec.new do |s|
   s.description = ''
   s.requires_arc = true
 
+  s.public_header_files = 'TBOTRManager/*.h'
 end
