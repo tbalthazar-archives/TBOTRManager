@@ -891,7 +891,7 @@ static OtrlMessageAppOps ui_ops = {
 //    }
   
   if (isInternalProtocolMsg) {
-    NSLog(@"-- %@ was an internal protocol message", [NSString stringWithUTF8String:newMessageC]);
+    NSLog(@"-- %@ was an internal protocol message", message);
   }
   else {
     if (newMessageC) {
