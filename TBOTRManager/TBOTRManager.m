@@ -79,12 +79,21 @@ static int is_logged_in_cb(void *opdata, const char *accountname,
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /*
  * Send the given IM to the given recipient from the given
- * accountname/protocol.$
+ * accountname/protocol.
  */
 // TODO: implement this function
 static void inject_message_cb(void *opdata, const char *accountname,
                               const char *protocol, const char *recipient, const char *message) {
   NSLog(@"inject_message_cb");
+  TBOTRManager *otrManager = [TBOTRManager sharedOTRManager];
+  if ([otrManager.delegate
+       respondsToSelector:@selector(OTRManager:sendMessage:from:to:protocol:)]) {
+    [otrManager.delegate OTRManager:otrManager
+                        sendMessage:[NSString stringWithUTF8String:message]
+                               from:[NSString stringWithUTF8String:accountname]
+                                 to:[NSString stringWithUTF8String:recipient]
+                           protocol:[NSString stringWithUTF8String:protocol]];
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -179,67 +188,21 @@ static void still_secure_cb(void *opdata, ConnContext *context, int is_reply) {
   //  [otrKit updateEncryptionStatusWithContext:context];
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
 /*
  * Find the maximum message size supported by this protocol.
+ *
+ * This method is called whenever a message is about to be sent with
+ * fragmentation enabled.  The return value is checked against the size of
+ * the message to be sent to determine whether fragmentation is necessary.
+ *
+ * Setting max_message_size to NULL will disable the fragmentation of all
+ * sent messages; returning 0 from this callback will disable fragmentation
+ * of a particular message.  The latter is useful, for example, for
+ * protocols like XMPP (Jabber) that do not require fragmentation at all.
  */
-// TODO: implement this function
 static int max_message_size_cb(void *opdata, ConnContext *context) {
   NSLog(@"max_message_size_cb");
   return 0;
-  
-  /*Although the maximum message size depends on a number of factors, we
-   found experimentally that the following rough values based solely on the
-   (pidgin) protocol name work well:
-   "prpl-msn",   1409
-   "prpl-icq",   2346
-   "prpl-aim",   2343
-   "prpl-yahoo", 832
-   "prpl-gg",    1999
-   "prpl-irc",   417
-   "prpl-oscar", 2343
-   */
-  /*void* lookup_result = g_hash_table_lookup(mms_table, context->protocol);
-   if (!lookup_result)
-   return 0;
-   else
-   return *((int*)lookup_result);*/
-  
-  //  OTRKit *otrKit = [OTRKit sharedInstance];
-  //  if (otrKit.delegate && [otrKit.delegate respondsToSelector:@selector(maxMessageSizeForProtocol:)]) {
-  //    return [otrKit.delegate maxMessageSizeForProtocol:[NSString stringWithUTF8String:context->protocol]];
-  //  }
-  //
-  //  if(context->protocol)
-  //  {
-  //    NSString *protocol = [NSString stringWithUTF8String:context->protocol];
-  //
-  //    if([protocol isEqualToString:@"prpl-oscar"])
-  //      return 2343;
-  //  }
-  //  return 0;
-  
-  // adium
-  //  AIChat *chat = chatForContext(context);
-  //
-  //  /* Values from http://www.cypherpunks.ca/otr/UPGRADING-libotr-3.1.0.txt */
-  //  static NSDictionary *maxSizeByServiceClassDict = nil;
-  //  if (!maxSizeByServiceClassDict) {
-  //    maxSizeByServiceClassDict = [[NSDictionary alloc] initWithObjectsAndKeys:
-  //                                 [NSNumber numberWithInteger:2343], @"AIM-compatible",
-  //                                 [NSNumber numberWithInteger:1409], @"MSN",
-  //                                 [NSNumber numberWithInteger:832], @"Yahoo!",
-  //                                 [NSNumber numberWithInteger:1999], @"Gadu-Gadu",
-  //                                 [NSNumber numberWithInteger:417], @"IRC",
-  //                                 nil];
-  //  }
-  //
-  //  /* This will return 0 if we don't know (unknown protocol) or don't need it (Jabber),
-  //   * which will disable fragmentation.
-  //   */
-  //  int ret = [[maxSizeByServiceClassDict objectForKey:chat.account.service.serviceClass] intValue];
-  //
-  //  return ret;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -806,6 +769,24 @@ static OtrlMessageAppOps ui_ops = {
  */
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+- (NSString *)OTRQueryMessageForAccount:(NSString *)account {
+  // Note that we pass a name for display, not internal usage
+	char *msg = otrl_proto_default_query_msg([account UTF8String], OTRL_POLICY_DEFAULT);
+  
+	if (msg) {
+    NSString *message = [NSString stringWithUTF8String:msg];
+    NSLog(@"-- otr session message : %@", message);
+    free(msg);
+    return message;
+  }
+  else {
+    NSLog(@"-- no otr sessions message");
+  }
+		
+  return @"";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)requestOTRSessionWithAccount:(NSString *)account {
 	//Note that we pass a name for display, not internal usage
 	char *msg = otrl_proto_default_query_msg([account UTF8String], OTRL_POLICY_DEFAULT);
@@ -881,6 +862,60 @@ static OtrlMessageAppOps ui_ops = {
   return newMessage;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+- (NSString *)decodeMessage:(NSString *)message
+                  recipient:(NSString *)recipient
+                accountName:(NSString *)accountName
+                   protocol:(NSString *)protocol {
+  if (![message length] || ![recipient length] ||
+      ![accountName length] || ![protocol length]) return @"";
+  
+  char *newMessageC = NULL;
+  ConnContext *context = [self contextForUsername:recipient
+                                      accountName:accountName
+                                         protocol:protocol];
+
+  BOOL isInternalProtocolMsg = otrl_message_receiving(otr_userstate, &ui_ops, NULL,
+                                                      [accountName UTF8String],
+                                                      [protocol UTF8String],
+                                                      [recipient UTF8String],
+                                                      [message UTF8String],
+                                                      &newMessageC, NULL,
+                                                      &context, NULL, NULL);
+  NSString *newMessage = @"";
+  
+//    if (context) {
+//      if (context->msgstate == OTRL_MSGSTATE_FINISHED) {
+//        [self disableEncryptionForUsername:recipient accountName:accountName protocol:protocol];
+//      }
+//    }
+  
+  if (isInternalProtocolMsg) {
+    NSLog(@"-- %@ was an internal protocol message", [NSString stringWithUTF8String:newMessageC]);
+  }
+  else {
+    if (newMessageC) {
+      newMessage = [NSString stringWithUTF8String:newMessageC];
+      NSLog(@"-- message has been decrypted : %@", newMessage);
+    }
+    else {
+      newMessage = message;
+      NSLog(@"-- message wasn't an OTR message : %@", newMessage);
+    }
+  }
+  otrl_message_free(newMessageC);
+  
+  return newMessage;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+- (NSString *)fingerprintForAccountName:(NSString *)accountName protocol:(NSString *)protocol {
+  NSString *fingerprintString = nil;
+  char our_hash[45];
+  otrl_privkey_fingerprint(otr_userstate, our_hash, [accountName UTF8String], [protocol UTF8String]);
+  fingerprintString = [NSString stringWithUTF8String:our_hash];
+  return fingerprintString;
+}
 
 
 //char		*fullOutgoingMessage = NULL;
