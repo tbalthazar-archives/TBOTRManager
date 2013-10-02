@@ -27,7 +27,7 @@
                 accountName:(NSString *)accountName
                    protocol:(NSString *)protocol;
 - (NSString *)decodeMessage:(NSString *)message
-                  recipient:(NSString *)recipient
+                     sender:(NSString *)sender
                 accountName:(NSString *)accountName
                    protocol:(NSString *)protocol;
 - (NSString *)fingerprintForAccountName:(NSString *)accountName protocol:(NSString *)protocol;
@@ -41,7 +41,7 @@
 
 - (void)OTRManager:(TBOTRManager *)OTRManager
        sendMessage:(NSString *)message
-              from:(NSString *)sender
+       accountName:(NSString *)accountName
                 to:(NSString *)recipient
           protocol:(NSString *)protocol;
 

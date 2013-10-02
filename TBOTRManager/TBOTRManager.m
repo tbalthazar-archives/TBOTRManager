@@ -21,6 +21,7 @@
 + (void)generatePrivateKeyForAccount:(NSString *)account protocol:(NSString *)protocol;
 + (NSString *)documentsDirectory;
 + (NSString *)privateKeyPath;
++ (NSString *)instanceTagPath;
 - (ConnContext *)contextForUsername:(NSString *)username
                         accountName:(NSString *)accountName
                            protocol:(NSString *) protocol;
@@ -87,10 +88,10 @@ static void inject_message_cb(void *opdata, const char *accountname,
   NSLog(@"inject_message_cb");
   TBOTRManager *otrManager = [TBOTRManager sharedOTRManager];
   if ([otrManager.delegate
-       respondsToSelector:@selector(OTRManager:sendMessage:from:to:protocol:)]) {
+       respondsToSelector:@selector(OTRManager:sendMessage:accountName:to:protocol:)]) {
     [otrManager.delegate OTRManager:otrManager
                         sendMessage:[NSString stringWithUTF8String:message]
-                               from:[NSString stringWithUTF8String:accountname]
+                        accountName:[NSString stringWithUTF8String:accountname]
                                  to:[NSString stringWithUTF8String:recipient]
                            protocol:[NSString stringWithUTF8String:protocol]];
   }
@@ -600,15 +601,15 @@ static void handle_msg_event_cb(void *opdata, OtrlMessageEvent msg_event,
  * Create a instance tag for the given accountname/protocol if
  * desired.
  */
-// TODO: implement this function
 static void create_instag_cb(void *opdata, const char *accountname, const char *protocol) {
-  //  OTRKit *otrKit = [OTRKit sharedInstance];
-  //  FILE *instagf;
-  //  NSString *path = [otrKit instanceTagsPath];
-  //  instagf = fopen([path UTF8String], "w+b");
-  //  otrl_instag_generate_FILEp(userState, instagf, accountname, protocol);
-  //  fclose(instagf);
-  NSLog(@"create_instag_cb");
+  FILE *instagf;
+  NSString *isntanceTagPath = [TBOTRManager instanceTagPath];
+  instagf = fopen([isntanceTagPath UTF8String], "w+b");
+  otrl_instag_generate_FILEp(otr_userstate, instagf, accountname, protocol);
+  fclose(instagf);
+  
+  NSLog(@"create_instag_cb for %@, %@",
+        [NSString stringWithUTF8String:accountname], [NSString stringWithUTF8String:protocol]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -815,6 +816,11 @@ static OtrlMessageAppOps ui_ops = {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
++ (NSString *)instanceTagPath {
+  return [[self documentsDirectory] stringByAppendingPathComponent:@"instance-tag"];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 - (ConnContext *)contextForUsername:(NSString *)username
                         accountName:(NSString *)accountName
                            protocol:(NSString *) protocol {
@@ -864,21 +870,21 @@ static OtrlMessageAppOps ui_ops = {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 - (NSString *)decodeMessage:(NSString *)message
-                  recipient:(NSString *)recipient
+                     sender:(NSString *)sender
                 accountName:(NSString *)accountName
                    protocol:(NSString *)protocol {
-  if (![message length] || ![recipient length] ||
+  if (![message length] || ![sender length] ||
       ![accountName length] || ![protocol length]) return @"";
   
   char *newMessageC = NULL;
-  ConnContext *context = [self contextForUsername:recipient
+  ConnContext *context = [self contextForUsername:sender
                                       accountName:accountName
                                          protocol:protocol];
 
   BOOL isInternalProtocolMsg = otrl_message_receiving(otr_userstate, &ui_ops, NULL,
                                                       [accountName UTF8String],
                                                       [protocol UTF8String],
-                                                      [recipient UTF8String],
+                                                      [sender UTF8String],
                                                       [message UTF8String],
                                                       &newMessageC, NULL,
                                                       &context, NULL, NULL);
