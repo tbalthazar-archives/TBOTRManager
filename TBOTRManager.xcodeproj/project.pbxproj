@@ -18,7 +18,7 @@
 		3301319717F9926100287253 /* TBOTRManagerTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 3301319617F9926100287253 /* TBOTRManagerTests.m */; };
 		330131D617F995C000287253 /* libgcrypt.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 330131D317F995C000287253 /* libgcrypt.a */; };
 		330131D717F995C000287253 /* libgpg-error.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 330131D417F995C000287253 /* libgpg-error.a */; };
-		330131D817F995C000287253 /* libotr.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 330131D517F995C000287253 /* libotr.a */; };
+		333D713817FF181200E245A4 /* libotr.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 333D713717FF181200E245A4 /* libotr.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -77,7 +77,7 @@
 		330131D117F995C000287253 /* version.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = version.h; sourceTree = "<group>"; };
 		330131D317F995C000287253 /* libgcrypt.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libgcrypt.a; sourceTree = "<group>"; };
 		330131D417F995C000287253 /* libgpg-error.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = "libgpg-error.a"; sourceTree = "<group>"; };
-		330131D517F995C000287253 /* libotr.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libotr.a; sourceTree = "<group>"; };
+		333D713717FF181200E245A4 /* libotr.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libotr.a; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -88,7 +88,7 @@
 				330131D617F995C000287253 /* libgcrypt.a in Frameworks */,
 				3301317B17F9926100287253 /* Foundation.framework in Frameworks */,
 				330131D717F995C000287253 /* libgpg-error.a in Frameworks */,
-				330131D817F995C000287253 /* libotr.a in Frameworks */,
+				333D713817FF181200E245A4 /* libotr.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -218,9 +218,9 @@
 		330131D217F995C000287253 /* lib */ = {
 			isa = PBXGroup;
 			children = (
+				333D713717FF181200E245A4 /* libotr.a */,
 				330131D317F995C000287253 /* libgcrypt.a */,
 				330131D417F995C000287253 /* libgpg-error.a */,
-				330131D517F995C000287253 /* libotr.a */,
 			);
 			path = lib;
 			sourceTree = "<group>";
@@ -430,7 +430,6 @@
 				GCC_PREFIX_HEADER = "TBOTRManager/TBOTRManager-Prefix.pch";
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					/Users/tba/Documents/dev/code/Cryptocat/TBOTRManager/TBOTRManager/include/lib,
 					/Users/tba/Documents/dev/code/Cryptocat/TBOTRManager/TBOTRManager/dependencies/lib,
 				);
 				OTHER_LDFLAGS = "-ObjC";
@@ -447,7 +446,6 @@
 				GCC_PREFIX_HEADER = "TBOTRManager/TBOTRManager-Prefix.pch";
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					/Users/tba/Documents/dev/code/Cryptocat/TBOTRManager/TBOTRManager/include/lib,
 					/Users/tba/Documents/dev/code/Cryptocat/TBOTRManager/TBOTRManager/dependencies/lib,
 				);
 				OTHER_LDFLAGS = "-ObjC";
@@ -513,6 +511,7 @@
 				3301319C17F9926100287253 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		3301319D17F9926100287253 /* Build configuration list for PBXNativeTarget "TBOTRManagerTests" */ = {
 			isa = XCConfigurationList;
@@ -521,6 +520,7 @@
 				3301319F17F9926100287253 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

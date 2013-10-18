@@ -13,18 +13,26 @@
 #import "message.h"
 #import "privkey.h"
 
+typedef void (^TBPrivateKeyCompletionBlock)();
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 @interface TBOTRManager ()
 
-+ (void)generatePrivateKeyForAccount:(NSString *)account protocol:(NSString *)protocol;
+@property (nonatomic, assign, getter=isPrivateKeyGenerating) BOOL privateKeyGenerating;
+@property (nonatomic, strong) NSMutableArray *pkCompletionBlocks;
+
 + (NSString *)documentsDirectory;
 + (NSString *)privateKeyPath;
 + (NSString *)instanceTagPath;
 - (ConnContext *)contextForUsername:(NSString *)username
                         accountName:(NSString *)accountName
                            protocol:(NSString *) protocol;
+- (void)generatePrivateKeyForAccount:(NSString *)account
+                            protocol:(NSString *)protocol
+                     completionBlock:(TBPrivateKeyCompletionBlock)completionBlock;
+
 @end
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -725,6 +733,9 @@ static OtrlMessageAppOps ui_ops = {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (id)init {
   if (self=[super init]) {
+    _privateKeyGenerating = NO;
+    _pkCompletionBlocks = [NSMutableArray array];
+    
     // init otr lib
     OTRL_INIT;
     otr_userstate = otrl_userstate_create();
@@ -739,35 +750,9 @@ static OtrlMessageAppOps ui_ops = {
 #pragma mark Public Methods
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-+ (void)generatePrivateKeyForAccount:(NSString *)account protocol:(NSString *)protocol {
-  NSLog(@"-- asked to generate a private key");
-  const char *accountC = [account cStringUsingEncoding:NSUTF8StringEncoding];
-  const char *protocolC = [protocol cStringUsingEncoding:NSUTF8StringEncoding];
-  OtrlPrivKey *privateKey = otrl_privkey_find(otr_userstate, accountC, protocolC);
-  
-  if (privateKey) return;
-  NSLog(@"-- will generate a private key");
-  NSString *privateKeyPath = [self privateKeyPath];
-  const char *privateKeyPathC = [privateKeyPath cStringUsingEncoding:NSUTF8StringEncoding];
-  
-  otrl_privkey_generate(otr_userstate, privateKeyPathC, accountC, protocolC);
+- (void)generatePrivateKeyForAccount:(NSString *)account protocol:(NSString *)protocol {
+  [self generatePrivateKeyForAccount:account protocol:protocol completionBlock:NULL];
 }
-
-/*
- -(void)generatePrivateKeyForUserState:(OtrlUserState)userState accountName:(NSString *)accountName protocol:(NSString *)protocol startGenerating:(void(^)(void))startGeneratingBlock completion:(void(^)(void))completionBlock
- {
- OtrlPrivKey * privateKey = otrl_privkey_find(userState, [accountName UTF8String], [protocol UTF8String]);
- if (!privateKey) {
- if (startGeneratingBlock) {
- startGeneratingBlock();
- }
- [self generatePrivateKeyForUserState:userState accountName:accountName protocol:protocol completion:completionBlock];
- }
- else if(completionBlock) {
- completionBlock();
- }
- }
- */
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 - (NSString *)OTRQueryMessageForAccount:(NSString *)account {
@@ -831,41 +816,43 @@ static OtrlMessageAppOps ui_ops = {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-- (NSString *)encodeMessage:(NSString *)message
+- (void)encodeMessage:(NSString *)message
             recipient:(NSString *)recipient
           accountName:(NSString *)accountName
-             protocol:(NSString *)protocol {
-  [[self class] generatePrivateKeyForAccount:accountName protocol:protocol];
-  
-  ConnContext *context = [self contextForUsername:recipient
-                                      accountName:accountName
-                                         protocol:protocol];
-  gcry_error_t err;
-  char *newMessageC = NULL;
-  
-  err = otrl_message_sending(otr_userstate, &ui_ops, NULL,
-                             [accountName UTF8String], [protocol UTF8String], [recipient UTF8String], OTRL_INSTAG_BEST, [message UTF8String], NULL, &newMessageC, OTRL_FRAGMENT_SEND_SKIP, &context,
-                             NULL, NULL);
-  if (err!=GPG_ERR_NO_ERROR) {
-    NSLog(@"!!!!! error while sending the message : %d", err);
-  }
-  
-  if (err==GPG_ERR_NO_ERROR && !newMessageC) {
-    NSLog(@"!!!!! There was no error, but an OTR message could not be made.\
-          perhaps you need to run some key authentication first...");
-  }
-  
-  NSString *newMessage = @"";
-  if (newMessageC) {
-    newMessage = [NSString stringWithUTF8String:newMessageC];
-  }
-  
-  otrl_message_free(newMessageC);
-  
-  NSLog(@"-- org message : %@", message);
-  NSLog(@"-- encrypted message : %@", newMessage);
-  
-  return newMessage;
+             protocol:(NSString *)protocol
+      completionBlock:(TBMessageEncodingCompletionBlock)completionBlock {
+  [self generatePrivateKeyForAccount:accountName
+                            protocol:protocol
+                     completionBlock:^
+  {
+    ConnContext *context = [self contextForUsername:recipient
+                                        accountName:accountName
+                                           protocol:protocol];
+    gcry_error_t err;
+    char *newMessageC = NULL;
+    
+    err = otrl_message_sending(otr_userstate, &ui_ops, NULL,
+                               [accountName UTF8String], [protocol UTF8String], [recipient UTF8String], OTRL_INSTAG_BEST, [message UTF8String], NULL, &newMessageC, OTRL_FRAGMENT_SEND_SKIP, &context,
+                               NULL, NULL);
+    if (err!=GPG_ERR_NO_ERROR) {
+      NSLog(@"!!!!! error while sending the message : %d", err);
+    }
+    
+    if (err==GPG_ERR_NO_ERROR && !newMessageC) {
+      NSLog(@"!!!!! There was no error, but an OTR message could not be made.\
+            perhaps you need to run some key authentication first...");
+    }
+    
+    NSString *newMessage = @"";
+    if (newMessageC) {
+      newMessage = [NSString stringWithUTF8String:newMessageC];
+    }
+    
+    otrl_message_free(newMessageC);
+    completionBlock(message);
+    NSLog(@"-- org message : %@", message);
+    NSLog(@"-- encrypted message : %@", newMessage);
+  }];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -923,59 +910,62 @@ static OtrlMessageAppOps ui_ops = {
   return fingerprintString;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+- (void)generatePrivateKeyForAccount:(NSString *)account
+                            protocol:(NSString *)protocol
+                     completionBlock:(TBPrivateKeyCompletionBlock)completionBlock {
+  NSLog(@"-- asked to generate a private key for : %@", account);
+  
+  // store the completion block cause this method could be called several times while
+  // the private key is generated in the background
+  if (completionBlock!=NULL) {
+    [self.pkCompletionBlocks addObject:completionBlock];
+  }
+  
+  if (self.isPrivateKeyGenerating) {
+    NSLog(@"-- private key is already generating, storing the block for later");
+    return;
+  }
+  
+  // on the background queue
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    // search for an existing private key
+    const char *accountC = [account cStringUsingEncoding:NSUTF8StringEncoding];
+    const char *protocolC = [protocol cStringUsingEncoding:NSUTF8StringEncoding];
+    __block OtrlPrivKey *privateKey;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+      privateKey = otrl_privkey_find(otr_userstate, accountC, protocolC);
+    });
+    
+    // generate the private key in the background
+    if (!privateKey) {
+      dispatch_sync(dispatch_get_main_queue(), ^{
+        self.privateKeyGenerating = YES;
+      });
 
-//char		*fullOutgoingMessage = NULL;
-//
-//gcry_error_t err;
-//
-//if (!username || !originalMessage)
-//return;
-//
-//err = otrl_message_sending(otrg_plugin_userstate, &ui_ops, /* opData */ NULL,
-//                           accountname, protocol, username, originalMessage, /* tlvs */ NULL, &fullOutgoingMessage,
-//                           /* add_appdata cb */NULL, /* appdata */ NULL);
-//
-//if (err && fullOutgoingMessage == NULL) {
-//  //Be *sure* not to send out plaintext
-//  [inContentMessage setEncodedMessage:nil];
-//
-//} else if (fullOutgoingMessage) {
-
-
-/*
- - (void) encodeMessage:(NSString*)message recipient:(NSString*)recipient accountName:(NSString*)accountName protocol:(NSString*)protocol startGeneratingKeysBlock:(void (^)(void))generatingKeysBlock success:(void (^)(NSString * message))success
- {
- __block gcry_error_t err;
- __block char *newmessage = NULL;
- 
- 
- __block ConnContext *context = [self contextForUsername:recipient accountName:accountName protocol:protocol];
- 
- NSString * (^encodeBlock)(void) = ^() {
- err = otrl_message_sending(userState, &ui_ops, NULL,
- [accountName UTF8String], [protocol UTF8String], [recipient UTF8String], OTRL_INSTAG_BEST, [message UTF8String], NULL, &newmessage, OTRL_FRAGMENT_SEND_SKIP, &context,
- NULL, NULL);
- NSString *newMessage = nil;
- //NSLog(@"newmessage char: %s",newmessage);
- if(newmessage)
- newMessage = [NSString stringWithUTF8String:newmessage];
- else
- newMessage = @"";
- 
- otrl_message_free(newmessage);
- 
- return newMessage;
- };
- 
- __block NSString * finalMessage = nil;
- //need to check/create keys
- [self generatePrivateKeyForUserState:userState accountName:accountName protocol:protocol startGenerating:generatingKeysBlock completion:^{
- finalMessage = encodeBlock();
- if (success) {
- success(finalMessage);
- }
- }];
- }
- */
+      NSLog(@"-- generating private key on %@ thread",
+            ([NSThread isMainThread] ? @"main" : @"bg"));
+      NSString *privateKeyPath = [[self class] privateKeyPath];
+      const char *privateKeyPathC = [privateKeyPath cStringUsingEncoding:NSUTF8StringEncoding];
+      
+      otrl_privkey_generate(otr_userstate, privateKeyPathC, accountC, protocolC);
+      NSLog(@"-- finished generating private key on %@ thread",
+            ([NSThread isMainThread] ? @"main" : @"bg"));
+      dispatch_sync(dispatch_get_main_queue(), ^{
+        self.privateKeyGenerating = NO;
+      });
+    }
+    
+    // when the private key is generated, perform on the main thread :
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if ([self.pkCompletionBlocks count] > 0) {
+        for (TBPrivateKeyCompletionBlock aBlock in self.pkCompletionBlocks) {
+          aBlock();
+        }
+        self.pkCompletionBlocks = [NSMutableArray array];
+      }
+    });
+  });
+}
 
 @end
