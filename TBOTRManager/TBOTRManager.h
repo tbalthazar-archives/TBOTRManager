@@ -22,8 +22,6 @@ typedef void (^TBMessageEncodingCompletionBlock)(NSString *encodedMessage);
 + (TBOTRManager *)sharedOTRManager;
 
 - (void)generatePrivateKeyForAccount:(NSString *)account protocol:(NSString *)protocol;
-- (NSString *)OTRQueryMessageForAccount:(NSString *)account;
-- (void)requestOTRSessionWithAccount:(NSString *)account;
 - (void)encodeMessage:(NSString *)message
             recipient:(NSString *)recipient
           accountName:(NSString *)accountName

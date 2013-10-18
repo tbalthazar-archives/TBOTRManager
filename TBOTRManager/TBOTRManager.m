@@ -20,7 +20,6 @@ typedef void (^TBPrivateKeyCompletionBlock)();
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 @interface TBOTRManager ()
 
-@property (nonatomic, assign, getter=isPrivateKeyGenerating) BOOL privateKeyGenerating;
 @property (nonatomic, strong) NSMutableArray *pkCompletionBlocks;
 
 + (NSString *)documentsDirectory;
@@ -733,7 +732,6 @@ static OtrlMessageAppOps ui_ops = {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (id)init {
   if (self=[super init]) {
-    _privateKeyGenerating = NO;
     _pkCompletionBlocks = [NSMutableArray array];
     
     // init otr lib
@@ -752,36 +750,6 @@ static OtrlMessageAppOps ui_ops = {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)generatePrivateKeyForAccount:(NSString *)account protocol:(NSString *)protocol {
   [self generatePrivateKeyForAccount:account protocol:protocol completionBlock:NULL];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-- (NSString *)OTRQueryMessageForAccount:(NSString *)account {
-  // Note that we pass a name for display, not internal usage
-	char *msg = otrl_proto_default_query_msg([account UTF8String], OTRL_POLICY_DEFAULT);
-  
-	if (msg) {
-    NSString *message = [NSString stringWithUTF8String:msg];
-    NSLog(@"-- otr session message : %@", message);
-    free(msg);
-    return message;
-  }
-  else {
-    NSLog(@"-- no otr sessions message");
-  }
-		
-  return @"";
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)requestOTRSessionWithAccount:(NSString *)account {
-	//Note that we pass a name for display, not internal usage
-	char *msg = otrl_proto_default_query_msg([account UTF8String], OTRL_POLICY_DEFAULT);
-  
-	NSLog(@"-- otr session message : %@", [NSString stringWithUTF8String:msg]);
-  //	[adium.contentController sendRawMessage:[NSString stringWithUTF8String:(msg ? msg : "?OTRv2?")]
-  //                                toContact:[inChat listObject]];
-	if (msg)
-		free(msg);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -989,68 +957,6 @@ static OtrlMessageAppOps ui_ops = {
         self.pkCompletionBlocks = [NSMutableArray array];
       }
     });
-  });
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)OLDgeneratePrivateKeyForAccount:(NSString *)account
-                            protocol:(NSString *)protocol
-                     completionBlock:(TBPrivateKeyCompletionBlock)completionBlock {
-  NSLog(@"-- asked to generate a private key for : %@", account);
-  
-  // store the completion block cause this method could be called several times while
-  // the private key is generated in the background
-  if (completionBlock!=NULL) {
-    [self.pkCompletionBlocks addObject:completionBlock];
-  }
-  
-  if (self.isPrivateKeyGenerating) {
-    NSLog(@"-- private key is already generating, storing the block for later");
-    return;
-  }
-  
-  self.privateKeyGenerating = YES;
-  
-  // on the background queue
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-    // search for an existing private key
-    const char *accountC = [account cStringUsingEncoding:NSUTF8StringEncoding];
-    const char *protocolC = [protocol cStringUsingEncoding:NSUTF8StringEncoding];
-    __block OtrlPrivKey *privateKey;
-    dispatch_sync(dispatch_get_main_queue(), ^{
-      privateKey = otrl_privkey_find(otr_userstate, accountC, protocolC);
-    });
-    
-    // generate the private key in the background
-    if (!privateKey) {
-//      dispatch_sync(dispatch_get_main_queue(), ^{
-//        self.privateKeyGenerating = YES;
-//      });
-
-      NSLog(@"-- generating private key on %@ thread",
-            ([NSThread isMainThread] ? @"main" : @"bg"));
-      NSString *privateKeyPath = [[self class] privateKeyPath];
-      const char *privateKeyPathC = [privateKeyPath cStringUsingEncoding:NSUTF8StringEncoding];
-      
-      otrl_privkey_generate(otr_userstate, privateKeyPathC, accountC, protocolC);
-      NSLog(@"-- finished generating private key on %@ thread",
-            ([NSThread isMainThread] ? @"main" : @"bg"));
-//      dispatch_sync(dispatch_get_main_queue(), ^{
-//        self.privateKeyGenerating = NO;
-//      });
-    }
-    
-    // when the private key is generated, perform on the main thread :
-    dispatch_async(dispatch_get_main_queue(), ^{
-      if ([self.pkCompletionBlocks count] > 0) {
-        for (TBPrivateKeyCompletionBlock aBlock in self.pkCompletionBlocks) {
-          aBlock();
-        }
-        self.pkCompletionBlocks = [NSMutableArray array];
-        self.privateKeyGenerating = NO;
-      }
-    });
-    
   });
 }
 
