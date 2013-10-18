@@ -753,6 +753,101 @@ static OtrlMessageAppOps ui_ops = {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+- (void)encodeMessage:(NSString *)message
+            recipient:(NSString *)recipient
+          accountName:(NSString *)accountName
+             protocol:(NSString *)protocol
+      completionBlock:(TBMessageEncodingCompletionBlock)completionBlock {
+  [self generatePrivateKeyForAccount:accountName
+                            protocol:protocol
+                     completionBlock:^
+   {
+     ConnContext *context = [self contextForUsername:recipient
+                                         accountName:accountName
+                                            protocol:protocol];
+     gcry_error_t err;
+     char *newMessageC = NULL;
+     
+     err = otrl_message_sending(otr_userstate, &ui_ops, NULL,
+                                [accountName UTF8String], [protocol UTF8String], [recipient UTF8String], OTRL_INSTAG_BEST, [message UTF8String], NULL, &newMessageC, OTRL_FRAGMENT_SEND_SKIP, &context,
+                                NULL, NULL);
+     if (err!=GPG_ERR_NO_ERROR) {
+       NSLog(@"!!!!! error while sending the message : %d", err);
+     }
+     
+     if (err==GPG_ERR_NO_ERROR && !newMessageC) {
+       NSLog(@"!!!!! There was no error, but an OTR message could not be made.\
+             perhaps you need to run some key authentication first...");
+     }
+     
+     NSString *newMessage = @"";
+     if (newMessageC) {
+       newMessage = [NSString stringWithUTF8String:newMessageC];
+     }
+     
+     otrl_message_free(newMessageC);
+     completionBlock(message);
+     NSLog(@"-- org message : %@", message);
+     NSLog(@"-- encrypted message : %@", newMessage);
+   }];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+- (NSString *)decodeMessage:(NSString *)message
+                     sender:(NSString *)sender
+                accountName:(NSString *)accountName
+                   protocol:(NSString *)protocol {
+  if (![message length] || ![sender length] ||
+      ![accountName length] || ![protocol length]) return @"";
+  
+  char *newMessageC = NULL;
+  ConnContext *context = [self contextForUsername:sender
+                                      accountName:accountName
+                                         protocol:protocol];
+  
+  BOOL isInternalProtocolMsg = otrl_message_receiving(otr_userstate, &ui_ops, NULL,
+                                                      [accountName UTF8String],
+                                                      [protocol UTF8String],
+                                                      [sender UTF8String],
+                                                      [message UTF8String],
+                                                      &newMessageC, NULL,
+                                                      &context, NULL, NULL);
+  NSString *newMessage = @"";
+  
+  //    if (context) {
+  //      if (context->msgstate == OTRL_MSGSTATE_FINISHED) {
+  //        [self disableEncryptionForUsername:recipient accountName:accountName protocol:protocol];
+  //      }
+  //    }
+  
+  if (isInternalProtocolMsg) {
+    NSLog(@"-- %@ was an internal protocol message", message);
+  }
+  else {
+    if (newMessageC) {
+      newMessage = [NSString stringWithUTF8String:newMessageC];
+      NSLog(@"-- message has been decrypted : %@", newMessage);
+    }
+    else {
+      newMessage = message;
+      NSLog(@"-- message wasn't an OTR message : %@", newMessage);
+    }
+  }
+  otrl_message_free(newMessageC);
+  
+  return newMessage;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+- (NSString *)fingerprintForAccountName:(NSString *)accountName protocol:(NSString *)protocol {
+  NSString *fingerprintString = nil;
+  char our_hash[45];
+  otrl_privkey_fingerprint(otr_userstate, our_hash, [accountName UTF8String], [protocol UTF8String]);
+  fingerprintString = [NSString stringWithUTF8String:our_hash];
+  return fingerprintString;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma mark -
 #pragma mark Private Methods
@@ -781,101 +876,6 @@ static OtrlMessageAppOps ui_ops = {
                                            [accountName UTF8String], [protocol UTF8String],
                                            OTRL_INSTAG_BEST, NO,NULL,NULL, NULL);
   return context;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-- (void)encodeMessage:(NSString *)message
-            recipient:(NSString *)recipient
-          accountName:(NSString *)accountName
-             protocol:(NSString *)protocol
-      completionBlock:(TBMessageEncodingCompletionBlock)completionBlock {
-  [self generatePrivateKeyForAccount:accountName
-                            protocol:protocol
-                     completionBlock:^
-  {
-    ConnContext *context = [self contextForUsername:recipient
-                                        accountName:accountName
-                                           protocol:protocol];
-    gcry_error_t err;
-    char *newMessageC = NULL;
-    
-    err = otrl_message_sending(otr_userstate, &ui_ops, NULL,
-                               [accountName UTF8String], [protocol UTF8String], [recipient UTF8String], OTRL_INSTAG_BEST, [message UTF8String], NULL, &newMessageC, OTRL_FRAGMENT_SEND_SKIP, &context,
-                               NULL, NULL);
-    if (err!=GPG_ERR_NO_ERROR) {
-      NSLog(@"!!!!! error while sending the message : %d", err);
-    }
-    
-    if (err==GPG_ERR_NO_ERROR && !newMessageC) {
-      NSLog(@"!!!!! There was no error, but an OTR message could not be made.\
-            perhaps you need to run some key authentication first...");
-    }
-    
-    NSString *newMessage = @"";
-    if (newMessageC) {
-      newMessage = [NSString stringWithUTF8String:newMessageC];
-    }
-    
-    otrl_message_free(newMessageC);
-    completionBlock(message);
-    NSLog(@"-- org message : %@", message);
-    NSLog(@"-- encrypted message : %@", newMessage);
-  }];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-- (NSString *)decodeMessage:(NSString *)message
-                     sender:(NSString *)sender
-                accountName:(NSString *)accountName
-                   protocol:(NSString *)protocol {
-  if (![message length] || ![sender length] ||
-      ![accountName length] || ![protocol length]) return @"";
-  
-  char *newMessageC = NULL;
-  ConnContext *context = [self contextForUsername:sender
-                                      accountName:accountName
-                                         protocol:protocol];
-
-  BOOL isInternalProtocolMsg = otrl_message_receiving(otr_userstate, &ui_ops, NULL,
-                                                      [accountName UTF8String],
-                                                      [protocol UTF8String],
-                                                      [sender UTF8String],
-                                                      [message UTF8String],
-                                                      &newMessageC, NULL,
-                                                      &context, NULL, NULL);
-  NSString *newMessage = @"";
-  
-//    if (context) {
-//      if (context->msgstate == OTRL_MSGSTATE_FINISHED) {
-//        [self disableEncryptionForUsername:recipient accountName:accountName protocol:protocol];
-//      }
-//    }
-  
-  if (isInternalProtocolMsg) {
-    NSLog(@"-- %@ was an internal protocol message", message);
-  }
-  else {
-    if (newMessageC) {
-      newMessage = [NSString stringWithUTF8String:newMessageC];
-      NSLog(@"-- message has been decrypted : %@", newMessage);
-    }
-    else {
-      newMessage = message;
-      NSLog(@"-- message wasn't an OTR message : %@", newMessage);
-    }
-  }
-  otrl_message_free(newMessageC);
-  
-  return newMessage;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-- (NSString *)fingerprintForAccountName:(NSString *)accountName protocol:(NSString *)protocol {
-  NSString *fingerprintString = nil;
-  char our_hash[45];
-  otrl_privkey_fingerprint(otr_userstate, our_hash, [accountName UTF8String], [protocol UTF8String]);
-  fingerprintString = [NSString stringWithUTF8String:our_hash];
-  return fingerprintString;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
