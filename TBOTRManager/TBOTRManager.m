@@ -914,6 +914,88 @@ static OtrlMessageAppOps ui_ops = {
 - (void)generatePrivateKeyForAccount:(NSString *)account
                             protocol:(NSString *)protocol
                      completionBlock:(TBPrivateKeyCompletionBlock)completionBlock {
+  const char *accountC = [account cStringUsingEncoding:NSUTF8StringEncoding];
+  const char *protocolC = [protocol cStringUsingEncoding:NSUTF8StringEncoding];
+
+  NSLog(@"!!! was asked to generate a private key");
+  
+  // if the private key already exist, execute the completion block and return
+  OtrlPrivKey *privateKey = otrl_privkey_find(otr_userstate, accountC, protocolC);
+  if (privateKey) {
+    NSLog(@"!!! a private key already exist, will return");
+    if (completionBlock!=NULL) {
+      NSLog(@"!!! before returning, executing the completion block (%d) pending",
+            [self.pkCompletionBlocks count]);
+      completionBlock();
+    }
+    return;
+  }
+  
+  /* Begin a private key generation that will potentially take place in
+   * a background thread.  This routine must be called from the main
+   * thread.  It will set *newkeyp, which you can pass to
+   * otrl_privkey_generate_calculate in a background thread.  If it
+   * returns gcry_error(GPG_ERR_EEXIST), then a privkey creation for
+   * this accountname/protocol is already in progress, and *newkeyp will
+   * be set to NULL. */
+  __block void *newkeyp;
+  gcry_error_t generateError;
+  generateError = otrl_privkey_generate_start(otr_userstate, accountC, protocolC, &newkeyp);
+
+  NSLog(@"!!! generateError : %d vs %d", generateError, gcry_error(GPG_ERR_EEXIST));
+  
+  // key is already being generated : keep the ocmpletionBlock for later and return
+  if (generateError==gcry_error(GPG_ERR_EEXIST)) {
+    NSLog(@"!!! a private key is already being generated");
+    if (completionBlock!=NULL) {
+      NSLog(@"!!! enqueuing the pending block while generating the pk");
+      [self.pkCompletionBlocks addObject:completionBlock];
+    }
+    return;
+  }
+  
+  // generate the private key on the backgorund thread
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
+    NSLog(@"!!! will generate the private key on %@ thread",
+          ([NSThread isMainThread] ? @"main" : @"bg"));
+
+    /* Do the private key generation calculation.  You may call this from a
+     * background thread.  When it completes, call
+     * otrl_privkey_generate_finish from the _main_ thread. */
+    otrl_privkey_generate_calculate(newkeyp);
+    
+    NSLog(@"!!! private key calculated");
+
+    // on the main thread
+    dispatch_sync(dispatch_get_main_queue(), ^{
+      NSString *privateKeyPath = [[self class] privateKeyPath];
+      NSLog(@"!!! private key path : %@", privateKeyPath);
+      const char *privateKeyPathC = [privateKeyPath cStringUsingEncoding:NSUTF8StringEncoding];
+
+      /* Call this from the main thread only.  It will write the newly created
+       * private key into the given file and store it in the OtrlUserState. */
+      otrl_privkey_generate_finish(otr_userstate, newkeyp, privateKeyPathC);
+      
+      NSLog(@"!!! finishing the private key generation on %@ thread",
+            ([NSThread isMainThread] ? @"main" : @"bg"));
+      
+      NSLog(@"!!! will execute %d completion blocks", [self.pkCompletionBlocks count]);
+      
+      // execute the pending completion blocks
+      if ([self.pkCompletionBlocks count] > 0) {
+        for (TBPrivateKeyCompletionBlock aBlock in self.pkCompletionBlocks) {
+          aBlock();
+        }
+        self.pkCompletionBlocks = [NSMutableArray array];
+      }
+    });
+  });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+- (void)OLDgeneratePrivateKeyForAccount:(NSString *)account
+                            protocol:(NSString *)protocol
+                     completionBlock:(TBPrivateKeyCompletionBlock)completionBlock {
   NSLog(@"-- asked to generate a private key for : %@", account);
   
   // store the completion block cause this method could be called several times while
@@ -927,6 +1009,8 @@ static OtrlMessageAppOps ui_ops = {
     return;
   }
   
+  self.privateKeyGenerating = YES;
+  
   // on the background queue
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
     // search for an existing private key
@@ -939,9 +1023,9 @@ static OtrlMessageAppOps ui_ops = {
     
     // generate the private key in the background
     if (!privateKey) {
-      dispatch_sync(dispatch_get_main_queue(), ^{
-        self.privateKeyGenerating = YES;
-      });
+//      dispatch_sync(dispatch_get_main_queue(), ^{
+//        self.privateKeyGenerating = YES;
+//      });
 
       NSLog(@"-- generating private key on %@ thread",
             ([NSThread isMainThread] ? @"main" : @"bg"));
@@ -951,9 +1035,9 @@ static OtrlMessageAppOps ui_ops = {
       otrl_privkey_generate(otr_userstate, privateKeyPathC, accountC, protocolC);
       NSLog(@"-- finished generating private key on %@ thread",
             ([NSThread isMainThread] ? @"main" : @"bg"));
-      dispatch_sync(dispatch_get_main_queue(), ^{
-        self.privateKeyGenerating = NO;
-      });
+//      dispatch_sync(dispatch_get_main_queue(), ^{
+//        self.privateKeyGenerating = NO;
+//      });
     }
     
     // when the private key is generated, perform on the main thread :
@@ -963,8 +1047,10 @@ static OtrlMessageAppOps ui_ops = {
           aBlock();
         }
         self.pkCompletionBlocks = [NSMutableArray array];
+        self.privateKeyGenerating = NO;
       }
     });
+    
   });
 }
 
