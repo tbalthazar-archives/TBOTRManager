@@ -120,7 +120,8 @@ static void update_context_list_cb(void *opdata) {
 static void confirm_fingerprint_received_cb(void *opdata, OtrlUserState us,
                                             const char *accountname, const char *protocol,
                                             const char *username, unsigned char fingerprint[20]) {
-  NSLog(@"confirm_fingerprint_received_cb");
+  NSLog(@"confirm_fingerprint_received_cb for username : %s, accountname : %s",
+        username, accountname);
   char our_hash[45], their_hash[45];
   
   // TODO: check if I cannot find the context using the obj-c method i wrote
