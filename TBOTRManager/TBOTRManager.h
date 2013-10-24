@@ -10,6 +10,7 @@
 
 @protocol TBOTRManagerDelegate;
 
+typedef void (^TBPrivateKeyCompletionBlock)();
 typedef void (^TBMessageEncodingCompletionBlock)(NSString *encodedMessage);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,7 +22,9 @@ typedef void (^TBMessageEncodingCompletionBlock)(NSString *encodedMessage);
 
 + (TBOTRManager *)sharedOTRManager;
 
-- (void)generatePrivateKeyForAccount:(NSString *)account protocol:(NSString *)protocol;
+- (void)generatePrivateKeyForAccount:(NSString *)account
+                            protocol:(NSString *)protocol
+                     completionBlock:(TBPrivateKeyCompletionBlock)completionBlock;
 - (void)encodeMessage:(NSString *)message
             recipient:(NSString *)recipient
           accountName:(NSString *)accountName
