@@ -49,6 +49,9 @@ static OtrlUserState otr_userstate = NULL;
 static OtrlPolicy policy_cb(void *opdata, ConnContext *context) {
   NSLog(@"policy_cb");
   return OTRL_POLICY_DEFAULT;
+  //return OTRL_POLICY_REQUIRE_ENCRYPTION;
+  //return OTRL_POLICY_ALLOW_V3;
+  //return OTRL_POLICY_ALWAYS;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -744,6 +747,24 @@ static OtrlMessageAppOps ui_ops = {
 #pragma mark Public Methods
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+- (NSString *)queryMessageForAccount:(NSString *)account {
+  // Note that we pass a name for display, not internal usage
+	char *msg = otrl_proto_default_query_msg([account UTF8String], OTRL_POLICY_DEFAULT);
+  
+	if (msg) {
+    NSString *message = [NSString stringWithUTF8String:msg];
+    NSLog(@"-- otr session message : %@", message);
+    free(msg);
+    return message;
+  }
+  else {
+    NSLog(@"-- no otr sessions message");
+  }
+  
+  return @"";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)generatePrivateKeyForAccount:(NSString *)account
                             protocol:(NSString *)protocol
                      completionBlock:(TBPrivateKeyCompletionBlock)completionBlock {
@@ -843,8 +864,11 @@ static OtrlMessageAppOps ui_ops = {
      gcry_error_t err;
      char *newMessageC = NULL;
      
+     NSLog(@"-- will encode message from %@ to %@", accountName, recipient);
      err = otrl_message_sending(otr_userstate, &ui_ops, NULL,
-                                [accountName UTF8String], [protocol UTF8String], [recipient UTF8String], OTRL_INSTAG_BEST, [message UTF8String], NULL, &newMessageC, OTRL_FRAGMENT_SEND_SKIP, &context,
+                                [accountName UTF8String], [protocol UTF8String],
+                                [recipient UTF8String], OTRL_INSTAG_BEST, [message UTF8String],
+                                NULL, &newMessageC, OTRL_FRAGMENT_SEND_SKIP, &context,
                                 NULL, NULL);
      if (err!=GPG_ERR_NO_ERROR) {
        NSLog(@"!!!!! error while sending the message : %d", err);
@@ -861,9 +885,11 @@ static OtrlMessageAppOps ui_ops = {
      }
      
      otrl_message_free(newMessageC);
-     completionBlock(newMessage);
+     
      NSLog(@"-- org message : %@", message);
      NSLog(@"-- encrypted message : %@", newMessage);
+
+     completionBlock(newMessage);
    }];
 }
 
