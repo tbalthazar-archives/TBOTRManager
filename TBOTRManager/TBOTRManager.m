@@ -19,6 +19,7 @@
 @interface TBOTRManager ()
 
 @property (nonatomic, strong) NSMutableArray *pkCompletionBlocks;
+@property (nonatomic, retain) NSTimer *pollTimer;
 
 + (NSString *)documentsDirectory;
 + (NSString *)privateKeyPath;
@@ -26,6 +27,7 @@
 - (ConnContext *)contextForUsername:(NSString *)username
                         accountName:(NSString *)accountName
                            protocol:(NSString *) protocol;
+- (void)messagePoll;
 
 @end
 
@@ -678,13 +680,19 @@ static void convert_data_free_cb(void *opdata, ConnContext *context, char *dest)
  */
 // TODO: implement this function
 static void timer_control_cb(void *opdata, unsigned int interval) {
-  //  OTRKit *otrKit = [OTRKit sharedInstance];
-  //  if (otrKit.pollTimer) {
-  //    [otrKit.pollTimer invalidate];
-  //    otrKit.pollTimer = nil;
-  //  }
-  //  otrKit.pollTimer = [NSTimer scheduledTimerWithTimeInterval:interval target:otrKit selector:@selector(messagePoll) userInfo:nil repeats:YES];
   NSLog(@"timer_control_cb");
+  
+  TBOTRManager *otrManager = [TBOTRManager sharedOTRManager];
+  if (otrManager.pollTimer!=nil) {
+    [otrManager.pollTimer invalidate];
+    otrManager.pollTimer = nil;
+  }
+  
+  otrManager.pollTimer = [NSTimer scheduledTimerWithTimeInterval:interval
+                                                          target:otrManager
+                                                        selector:@selector(messagePoll)
+                                                        userInfo:nil
+                                                         repeats:YES];
 }
 
 static OtrlMessageAppOps ui_ops = {
@@ -977,6 +985,11 @@ static OtrlMessageAppOps ui_ops = {
                                            [accountName UTF8String], [protocol UTF8String],
                                            OTRL_INSTAG_BEST, NO,NULL,NULL, NULL);
   return context;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+- (void) messagePoll {
+  otrl_message_poll(otr_userstate, &ui_ops, NULL);
 }
 
 @end
