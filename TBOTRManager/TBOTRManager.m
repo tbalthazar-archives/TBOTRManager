@@ -943,11 +943,34 @@ static OtrlMessageAppOps ui_ops = {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 - (NSString *)fingerprintForAccountName:(NSString *)accountName protocol:(NSString *)protocol {
+  NSLog(@"asking fingerprint for %@", accountName);
   NSString *fingerprintString = nil;
   char our_hash[45];
   otrl_privkey_fingerprint(otr_userstate, our_hash, [accountName UTF8String], [protocol UTF8String]);
   fingerprintString = [NSString stringWithUTF8String:our_hash];
   return fingerprintString;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+- (NSString *)fingerprintForRecipient:(NSString *)recipient
+                          accountName:(NSString *)accountName
+                             protocol:(NSString *)protocol {
+  Fingerprint * fingerprint = nil;
+  ConnContext *context = [self contextForUsername:recipient
+                                      accountName:accountName
+                                         protocol:protocol];
+  if(context) {
+    fingerprint = context->active_fingerprint;
+  }
+  
+  char their_hash[45];
+  if(fingerprint && fingerprint->fingerprint) {
+    otrl_privkey_hash_to_human(their_hash, fingerprint->fingerprint);
+    return [NSString stringWithUTF8String:their_hash];
+  }
+  else {
+    return nil;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

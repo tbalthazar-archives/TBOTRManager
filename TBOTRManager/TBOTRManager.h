@@ -36,6 +36,9 @@ typedef void (^TBMessageEncodingCompletionBlock)(NSString *encodedMessage);
                 accountName:(NSString *)accountName
                    protocol:(NSString *)protocol;
 - (NSString *)fingerprintForAccountName:(NSString *)accountName protocol:(NSString *)protocol;
+- (NSString *)fingerprintForRecipient:(NSString *)recipient
+                          accountName:(NSString *)accountName
+                             protocol:(NSString *)protocol;
 - (BOOL)isConversationEncryptedForAccountName:(NSString *)accountName
                                     recipient:(NSString *)recipient
                                      protocol:(NSString *)protocol;
