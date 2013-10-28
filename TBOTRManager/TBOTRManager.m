@@ -28,6 +28,7 @@
                         accountName:(NSString *)accountName
                            protocol:(NSString *) protocol;
 - (void)messagePoll;
+- (void)updateEncryptionStatusWithContext:(ConnContext*)context;
 
 @end
 
@@ -167,22 +168,20 @@ static void write_fingerprints_cb(void *opdata) {
 /*
  * A ConnContext has entered a secure state.
  */
-// TODO: implement this function
 static void gone_secure_cb(void *opdata, ConnContext *context) {
   NSLog(@"gone_secure_cb");
-  //  OTRKit *otrKit = [OTRKit sharedInstance];
-  //  [otrKit updateEncryptionStatusWithContext:context];
+  TBOTRManager *OTRManager = [TBOTRManager sharedOTRManager];
+  [OTRManager updateEncryptionStatusWithContext:context];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /*
  * A ConnContext has left a secure state.
  */
-// TODO: implement this function
 static void gone_insecure_cb(void *opdata, ConnContext *context) {
   NSLog(@"gone_insecure_cb");
-  //  OTRKit *otrKit = [OTRKit sharedInstance];
-  //  [otrKit updateEncryptionStatusWithContext:context];
+  TBOTRManager *OTRManager = [TBOTRManager sharedOTRManager];
+  [OTRManager updateEncryptionStatusWithContext:context];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -190,11 +189,10 @@ static void gone_insecure_cb(void *opdata, ConnContext *context) {
  * We have completed an authentication, using the D-H keys we
  * already knew.  is_reply indicates whether we initiated the AKE.
  */
-// TODO: implement this function
 static void still_secure_cb(void *opdata, ConnContext *context, int is_reply) {
   NSLog(@"still_secure_cb");
-  //  OTRKit *otrKit = [OTRKit sharedInstance];
-  //  [otrKit updateEncryptionStatusWithContext:context];
+  TBOTRManager *OTRManager = [TBOTRManager sharedOTRManager];
+  [OTRManager updateEncryptionStatusWithContext:context];
 }
 
 /*
@@ -761,12 +759,8 @@ static OtrlMessageAppOps ui_ops = {
   
 	if (msg) {
     NSString *message = [NSString stringWithUTF8String:msg];
-    NSLog(@"-- otr session message : %@", message);
     free(msg);
     return message;
-  }
-  else {
-    NSLog(@"-- no otr sessions message");
   }
   
   return @"";
@@ -957,6 +951,34 @@ static OtrlMessageAppOps ui_ops = {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+- (BOOL)isConversationEncryptedForAccountName:(NSString *)accountName
+                                    recipient:(NSString *)recipient
+                                     protocol:(NSString *)protocol {
+  ConnContext *context = [self contextForUsername:recipient
+                                      accountName:accountName
+                                         protocol:protocol];
+  if (!context) return NO;
+  
+  BOOL isEncrypted = NO;
+  switch (context->msgstate) {
+    case OTRL_MSGSTATE_ENCRYPTED:
+      isEncrypted = YES;
+      break;
+    case OTRL_MSGSTATE_FINISHED:
+      isEncrypted = NO;
+      break;
+    case OTRL_MSGSTATE_PLAINTEXT:
+      isEncrypted = NO;
+      break;
+    default:
+      isEncrypted = NO;
+      break;
+  }
+  
+  return isEncrypted;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma mark -
 #pragma mark Private Methods
@@ -991,5 +1013,24 @@ static OtrlMessageAppOps ui_ops = {
 - (void) messagePoll {
   otrl_message_poll(otr_userstate, &ui_ops, NULL);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+- (void)updateEncryptionStatusWithContext:(ConnContext*)context {
+  if ([self.delegate respondsToSelector:
+       @selector(OTRManager:didUpdateEncryptionStatus:forRecipient:accountName:protocol:)]) {
+    NSString *accountName = [NSString stringWithUTF8String:context->accountname];
+    NSString *recipient = [NSString stringWithUTF8String:context->username];
+    NSString *protocol = [NSString stringWithUTF8String:context->protocol];
+    BOOL isEncrypted = [self isConversationEncryptedForAccountName:accountName
+                                                         recipient:recipient
+                                                          protocol:protocol];
+    [self.delegate OTRManager:self
+    didUpdateEncryptionStatus:isEncrypted
+                 forRecipient:recipient
+                  accountName:accountName
+                     protocol:protocol];
+  }
+}
+
 
 @end

@@ -36,6 +36,9 @@ typedef void (^TBMessageEncodingCompletionBlock)(NSString *encodedMessage);
                 accountName:(NSString *)accountName
                    protocol:(NSString *)protocol;
 - (NSString *)fingerprintForAccountName:(NSString *)accountName protocol:(NSString *)protocol;
+- (BOOL)isConversationEncryptedForAccountName:(NSString *)accountName
+                                    recipient:(NSString *)recipient
+                                     protocol:(NSString *)protocol;
 
 @end
 
@@ -48,6 +51,11 @@ typedef void (^TBMessageEncodingCompletionBlock)(NSString *encodedMessage);
        sendMessage:(NSString *)message
        accountName:(NSString *)accountName
                 to:(NSString *)recipient
+          protocol:(NSString *)protocol;
+- (void)OTRManager:(TBOTRManager *)OTRManager
+didUpdateEncryptionStatus:(BOOL)isEncrypted
+      forRecipient:(NSString *)recipient
+       accountName:(NSString *)accountName
           protocol:(NSString *)protocol;
 
 @end
