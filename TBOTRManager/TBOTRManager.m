@@ -676,9 +676,8 @@ static void convert_data_free_cb(void *opdata, ConnContext *context, char *dest)
  * of long-past messages (the first messages of an OTR
  * conversation).
  */
-// TODO: implement this function
 static void timer_control_cb(void *opdata, unsigned int interval) {
-  NSLog(@"timer_control_cb");
+  NSLog(@"timer_control_cb with interval : %d", interval);
   
   TBOTRManager *otrManager = [TBOTRManager sharedOTRManager];
   if (otrManager.pollTimer!=nil) {
@@ -686,11 +685,14 @@ static void timer_control_cb(void *opdata, unsigned int interval) {
     otrManager.pollTimer = nil;
   }
   
-  otrManager.pollTimer = [NSTimer scheduledTimerWithTimeInterval:interval
-                                                          target:otrManager
-                                                        selector:@selector(messagePoll)
-                                                        userInfo:nil
-                                                         repeats:YES];
+  if (interval > 0) {
+    NSLog(@"timer_control_cb. setting a new timer : %d", interval);
+    otrManager.pollTimer = [NSTimer scheduledTimerWithTimeInterval:interval
+                                                            target:otrManager
+                                                          selector:@selector(messagePoll)
+                                                          userInfo:nil
+                                                           repeats:YES];
+  }
 }
 
 static OtrlMessageAppOps ui_ops = {
