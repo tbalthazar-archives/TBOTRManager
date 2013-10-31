@@ -21,6 +21,26 @@
 @property (nonatomic, strong) NSMutableArray *pkCompletionBlocks;
 @property (nonatomic, retain) NSTimer *pollTimer;
 
+/*
+ * The Authenticated Key Exchange (AKE) sequence consists of 4 messages :
+ *  - D-H Commit Message (?OTR:AAMC)
+ *  - D-H Key Message (?OTR:AAMK)
+ *  - Reveal Signature Message (?OTR:AAMR)
+ *  - Signature Message (?OTR:AAMS)
+ *
+ * (see the protocol spec here and search for the "D-H Commit Message" title : 
+ *  https://otr.cypherpunks.ca/Protocol-v3-4.0.0.html )
+ *
+ * The gone_secure callback is called after you receive the AAMR message.
+ * When gone_secure is called, you know that the next message libotr will
+ * ask you to send (via the inject_message callback) is the AAMS message.
+ * After this message has been sent, you can consider the conversation to be
+ * secured and start sending the user messages (Data Message, ?OTR:AAMD), the
+ * conversation between both ends can start.
+ *
+ */
+@property (nonatomic, assign) BOOL nextMessageIsSignatureMessage;
+
 + (NSString *)documentsDirectory;
 + (NSString *)privateKeyPath;
 + (NSString *)instanceTagPath;
@@ -90,18 +110,32 @@ static int is_logged_in_cb(void *opdata, const char *accountname,
  * Send the given IM to the given recipient from the given
  * accountname/protocol.
  */
-// TODO: implement this function
 static void inject_message_cb(void *opdata, const char *accountname,
                               const char *protocol, const char *recipient, const char *message) {
   NSLog(@"inject_message_cb");
   TBOTRManager *otrManager = [TBOTRManager sharedOTRManager];
+  NSString *accountNameString = [NSString stringWithUTF8String:accountname];
+  NSString *protocolString = [NSString stringWithUTF8String:protocol];
+  NSString *recipientString = [NSString stringWithUTF8String:recipient];
+  
+  // asks the delegate to send the message
   if ([otrManager.delegate
        respondsToSelector:@selector(OTRManager:sendMessage:accountName:to:protocol:)]) {
     [otrManager.delegate OTRManager:otrManager
                         sendMessage:[NSString stringWithUTF8String:message]
-                        accountName:[NSString stringWithUTF8String:accountname]
-                                 to:[NSString stringWithUTF8String:recipient]
-                           protocol:[NSString stringWithUTF8String:protocol]];
+                        accountName:accountNameString
+                                 to:recipientString
+                           protocol:protocolString];
+  }
+
+  // if the message we just asked to send was the signature message, notify the delegate
+  // that the conversation can be considered as secure
+  if (otrManager.nextMessageIsSignatureMessage) {
+    ConnContext *context = [otrManager contextForUsername:recipientString
+                                              accountName:accountNameString
+                                                 protocol:protocolString];
+    [otrManager updateEncryptionStatusWithContext:context];
+    otrManager.nextMessageIsSignatureMessage = NO;
   }
 }
 
@@ -170,8 +204,12 @@ static void write_fingerprints_cb(void *opdata) {
  */
 static void gone_secure_cb(void *opdata, ConnContext *context) {
   NSLog(@"gone_secure_cb");
+  /*
+   * The conversation is secured from our side. The next message that will be sent 
+   * (via inject_message) is the signature message.
+   */
   TBOTRManager *OTRManager = [TBOTRManager sharedOTRManager];
-  [OTRManager updateEncryptionStatusWithContext:context];
+  OTRManager.nextMessageIsSignatureMessage = YES;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -740,6 +778,7 @@ static OtrlMessageAppOps ui_ops = {
 - (id)init {
   if (self=[super init]) {
     _pkCompletionBlocks = [NSMutableArray array];
+    _nextMessageIsSignatureMessage = NO;
     
     // init otr lib
     OTRL_INIT;
