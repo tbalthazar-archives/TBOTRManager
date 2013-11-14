@@ -1054,6 +1054,15 @@ static OtrlMessageAppOps ui_ops = {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+- (void)disconnectRecipient:(NSString *)recipient
+             forAccountName:(NSString *)accountName
+                   protocol:(NSString *)protocol {
+  otrl_message_disconnect_all_instances(otr_userstate, &ui_ops, NULL,
+                                        [accountName UTF8String], [protocol UTF8String],
+                                        [recipient UTF8String]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma mark -
 #pragma mark Private Methods
