@@ -21,6 +21,7 @@ typedef void (^TBMessageEncodingCompletionBlock)(NSString *encodedMessage);
 @property (nonatomic, weak) id <TBOTRManagerDelegate> delegate;
 
 + (TBOTRManager *)sharedOTRManager;
+- (void)reset;
 
 - (NSString *)queryMessageForAccount:(NSString *)account;
 - (void)generatePrivateKeyForAccount:(NSString *)account

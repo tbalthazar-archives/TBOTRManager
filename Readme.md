@@ -10,4 +10,4 @@ TBOTRManger uses :
 * libgpg-error. Copyright 2003, 2004, 2005, 2006, 2007, 2013 g10 Code GmbH. [GNU LESSER GENERAL PUBLIC LICENSE Version 2.1](http://www.gnu.org/licenses/lgpl-2.1.txt)  
 * libotr. Copyright (C) 2004-2012  Ian Goldberg, Rob Smits, Chris Alexander, Willy Lew, Lisa Du, Nikita Borisov <otr@cypherpunks.ca>. [GNU LESSER GENERAL PUBLIC LICENSE Version 2.1](http://www.gnu.org/licenses/lgpl-2.1.txt)
 
-TBOTRManager is Copyright (c) 2014 Thomas Balthazar. [GNU LESSER GENERAL PUBLIC LICENSE Version 2.1](http://www.gnu.org/licenses/lgpl-2.1.txt)
+TBOTRManager is Copyright (c) 2013 Thomas Balthazar. [GNU LESSER GENERAL PUBLIC LICENSE Version 2.1](http://www.gnu.org/licenses/lgpl-2.1.txt)
