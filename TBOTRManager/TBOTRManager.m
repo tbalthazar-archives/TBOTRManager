@@ -20,6 +20,7 @@
 
 @property (nonatomic, strong) NSMutableArray *pkCompletionBlocks;
 @property (nonatomic, retain) NSTimer *pollTimer;
+@property (nonatomic, strong) dispatch_queue_t bgQueue;
 
 /*
  * The Authenticated Key Exchange (AKE) sequence consists of 4 messages :
@@ -59,6 +60,7 @@
 
 static TBOTRManager *sharedOTRManager = nil;
 static OtrlUserState otr_userstate = NULL;
+static void *newkeyp;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -779,6 +781,7 @@ static OtrlMessageAppOps ui_ops = {
   if (self=[super init]) {
     _pkCompletionBlocks = [NSMutableArray array];
     _nextMessageIsSignatureMessage = NO;
+    _bgQueue = dispatch_queue_create([@"TBOTRManager bgQueue" UTF8String], DISPATCH_QUEUE_SERIAL);
     
     // init otr lib
     OTRL_INIT;
@@ -792,7 +795,12 @@ static OtrlMessageAppOps ui_ops = {
 - (void)reset {
   [self.pollTimer invalidate];
   self.pollTimer = nil;
-
+  
+  self.bgQueue = nil;
+  
+  otrl_privkey_generate_cancelled(otr_userstate, newkeyp);
+  otrl_privkey_pending_forget_all(otr_userstate);
+  
   otrl_userstate_free(otr_userstate);
   otr_userstate = nil;
   
@@ -851,7 +859,7 @@ static OtrlMessageAppOps ui_ops = {
    * returns gcry_error(GPG_ERR_EEXIST), then a privkey creation for
    * this accountname/protocol is already in progress, and *newkeyp will
    * be set to NULL. */
-  __block void *newkeyp;
+  //__block void *newkeyp;
   gcry_error_t generateError;
   generateError = otrl_privkey_generate_start(otr_userstate, accountC, protocolC, &newkeyp);
   
@@ -868,7 +876,7 @@ static OtrlMessageAppOps ui_ops = {
   }
   
   // generate the private key on the backgorund thread
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
+  dispatch_async(self.bgQueue, ^{
     NSLog(@"!!! will generate the private key on %@ thread",
           ([NSThread isMainThread] ? @"main" : @"bg"));
     
@@ -881,23 +889,29 @@ static OtrlMessageAppOps ui_ops = {
     
     // on the main thread
     dispatch_sync(dispatch_get_main_queue(), ^{
-      NSString *privateKeyPath = [[self class] privateKeyPath];
-      NSLog(@"!!! private key path : %@", privateKeyPath);
-      const char *privateKeyPathC = [privateKeyPath cStringUsingEncoding:NSUTF8StringEncoding];
-      
-      /* Call this from the main thread only.  It will write the newly created
-       * private key into the given file and store it in the OtrlUserState. */
-      otrl_privkey_generate_finish(otr_userstate, newkeyp, privateKeyPathC);
-      
-      NSLog(@"!!! finishing the private key generation on %@ thread",
-            ([NSThread isMainThread] ? @"main" : @"bg"));
-            
-      // execute the pending completion blocks
-      NSLog(@"!!! executing the completion block, (%d) pending", [self.pkCompletionBlocks count]);
-      for (TBPrivateKeyCompletionBlock aBlock in self.pkCompletionBlocks) {
-        aBlock();
+      // if the OTRManager has been reset while generating the key, don't execute this
+      if (self.bgQueue!=nil) {
+        NSString *privateKeyPath = [[self class] privateKeyPath];
+        NSLog(@"!!! private key path : %@", privateKeyPath);
+        const char *privateKeyPathC = [privateKeyPath cStringUsingEncoding:NSUTF8StringEncoding];
+        
+        /* Call this from the main thread only.  It will write the newly created
+         * private key into the given file and store it in the OtrlUserState. */
+        otrl_privkey_generate_finish(otr_userstate, newkeyp, privateKeyPathC);
+        
+        NSLog(@"!!! finishing the private key generation on %@ thread",
+              ([NSThread isMainThread] ? @"main" : @"bg"));
+        
+        // execute the pending completion blocks
+        NSLog(@"!!! executing the completion block, (%d) pending", [self.pkCompletionBlocks count]);
+        for (TBPrivateKeyCompletionBlock aBlock in self.pkCompletionBlocks) {
+          aBlock();
+        }
+        self.pkCompletionBlocks = [NSMutableArray array];
       }
-      self.pkCompletionBlocks = [NSMutableArray array];
+      else {
+        NSLog(@"!!! will not finish the private key generation");
+      }
     });
   });
 }
