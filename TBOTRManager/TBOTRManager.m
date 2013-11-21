@@ -21,6 +21,7 @@
 @property (nonatomic, strong) NSMutableArray *pkCompletionBlocks;
 @property (nonatomic, retain) NSTimer *pollTimer;
 @property (nonatomic, strong) dispatch_queue_t bgQueue;
+@property (nonatomic, assign) BOOL isGeneratingPrivateKey;
 
 /*
  * The Authenticated Key Exchange (AKE) sequence consists of 4 messages :
@@ -782,6 +783,7 @@ static OtrlMessageAppOps ui_ops = {
     _pkCompletionBlocks = [NSMutableArray array];
     _nextMessageIsSignatureMessage = NO;
     _bgQueue = dispatch_queue_create([@"TBOTRManager bgQueue" UTF8String], DISPATCH_QUEUE_SERIAL);
+    _isGeneratingPrivateKey = NO;
     
     // init otr lib
     OTRL_INIT;
@@ -798,7 +800,10 @@ static OtrlMessageAppOps ui_ops = {
   
   self.bgQueue = nil;
   
-  otrl_privkey_generate_cancelled(otr_userstate, newkeyp);
+  if (self.isGeneratingPrivateKey) {
+    otrl_privkey_generate_cancelled(otr_userstate, newkeyp);
+  }
+  
   otrl_privkey_pending_forget_all(otr_userstate);
   
   otrl_userstate_free(otr_userstate);
@@ -875,6 +880,8 @@ static OtrlMessageAppOps ui_ops = {
     return;
   }
   
+  self.isGeneratingPrivateKey = YES;
+
   // generate the private key on the backgorund thread
   dispatch_async(self.bgQueue, ^{
     NSLog(@"!!! will generate the private key on %@ thread",
@@ -889,6 +896,7 @@ static OtrlMessageAppOps ui_ops = {
     
     // on the main thread
     dispatch_sync(dispatch_get_main_queue(), ^{
+      self.isGeneratingPrivateKey = NO;
       // if the OTRManager has been reset while generating the key, don't execute this
       if (self.bgQueue!=nil) {
         NSString *privateKeyPath = [[self class] privateKeyPath];
