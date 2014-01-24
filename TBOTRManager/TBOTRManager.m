@@ -930,6 +930,28 @@ static OtrlMessageAppOps ui_ops = {
         NSLog(@"!!! finishing the private key generation on %@ thread",
               ([NSThread isMainThread] ? @"main" : @"bg"));
         
+        // exclude the private key from backup
+        NSError *pkExcludeFromBackupError = nil;
+        NSURL *privateKeyURL = [NSURL fileURLWithPath:privateKeyPath];
+        BOOL pkExcludedFromBackup = [privateKeyURL setResourceValue:[NSNumber numberWithBool:YES]
+                                                             forKey:NSURLIsExcludedFromBackupKey
+                                                              error:&pkExcludeFromBackupError];
+        if (!pkExcludedFromBackup) {
+          NSLog(@"!!! Failed to exclude the private key from backup : %@",
+                pkExcludeFromBackupError);
+        }
+        
+        // set file protection
+        NSError *pkFileProtectionError = nil;
+        NSDictionary *attr = [NSDictionary dictionaryWithObject:NSFileProtectionComplete
+                                                         forKey:NSFileProtectionKey];
+        BOOL pkFileProtectionOk = [[NSFileManager defaultManager] setAttributes:attr
+                                                                   ofItemAtPath:privateKeyPath
+                                                                      error:&pkFileProtectionError];
+        if (!pkFileProtectionOk) {
+          NSLog(@"!!! Failed to set file protection on private key : %@", pkFileProtectionError);
+        }
+        
         // execute the pending completion blocks
         NSLog(@"!!! executing the completion block, (%d) pending", [self.pkCompletionBlocks count]);
         for (TBPrivateKeyCompletionBlock aBlock in self.pkCompletionBlocks) {
