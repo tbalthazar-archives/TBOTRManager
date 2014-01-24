@@ -810,6 +810,11 @@ static OtrlMessageAppOps ui_ops = {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)reset {
+  // delete the private key and instance tag
+  NSFileManager *fileManager = [NSFileManager defaultManager];
+  [fileManager removeItemAtPath:[[self class] privateKeyPath]  error:nil];
+  [fileManager removeItemAtPath:[[self class] instanceTagPath]  error:nil];
+    
   [self.pollTimer invalidate];
   self.pollTimer = nil;
   
