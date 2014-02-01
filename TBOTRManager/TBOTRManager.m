@@ -1004,9 +1004,6 @@ static OtrlMessageAppOps ui_ops = {
      
      otrl_message_free(newMessageC);
      
-     NSLog(@"-- org message : %@", message);
-     NSLog(@"-- encrypted message : %@", newMessage);
-
      completionBlock(newMessage);
    }];
 }
