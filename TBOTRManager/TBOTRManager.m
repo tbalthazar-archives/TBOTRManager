@@ -45,7 +45,7 @@
  *  - Reveal Signature Message (?OTR:AAMR)
  *  - Signature Message (?OTR:AAMS)
  *
- * (see the protocol spec here and search for the "D-H Commit Message" title : 
+ * (see the protocol spec here and search for the "D-H Commit Message" title :
  *  https://otr.cypherpunks.ca/Protocol-v3-4.0.0.html )
  *
  * The gone_secure callback is called after you receive the AAMR message.
@@ -103,7 +103,7 @@ static void create_privkey_cb(void *opdata, const char *accountname, const char 
   NSLog(@"create_privkey_cb");
   NSString *privateKeyPath = [TBOTRManager privateKeyPath];
   const char *privateKeyPathC = [privateKeyPath cStringUsingEncoding:NSUTF8StringEncoding];
-  
+
   otrl_privkey_generate(otr_userstate, privateKeyPathC, accountname, protocol);
 }
 
@@ -135,7 +135,7 @@ static void inject_message_cb(void *opdata, const char *accountname,
   NSString *accountNameString = [NSString stringWithUTF8String:accountname];
   NSString *protocolString = [NSString stringWithUTF8String:protocol];
   NSString *recipientString = [NSString stringWithUTF8String:recipient];
-  
+
   // asks the delegate to send the message
   if ([otrManager.delegate
        respondsToSelector:@selector(OTRManager:sendMessage:accountName:to:protocol:)]) {
@@ -176,15 +176,15 @@ static void confirm_fingerprint_received_cb(void *opdata, OtrlUserState us,
   NSLog(@"confirm_fingerprint_received_cb for username : %s, accountname : %s",
         username, accountname);
   char our_hash[45], their_hash[45];
-  
+
   // TODO: check if I cannot find the context using the obj-c method i wrote
   ConnContext *context = otrl_context_find(otr_userstate, username, accountname, protocol,
                                            OTRL_INSTAG_BEST, NO, NULL, NULL, NULL);
   if (!context) return;
-  
+
   otrl_privkey_fingerprint(otr_userstate, our_hash, context->accountname, context->protocol);
   otrl_privkey_hash_to_human(their_hash, fingerprint);
-  
+
   // TODO: implement this function
   /*
    OTRKit *otrKit = [OTRKit sharedInstance];
@@ -223,7 +223,7 @@ static void write_fingerprints_cb(void *opdata) {
 static void gone_secure_cb(void *opdata, ConnContext *context) {
   NSLog(@"gone_secure_cb");
   /*
-   * The conversation is secured from our side. The next message that will be sent 
+   * The conversation is secured from our side. The next message that will be sent
    * (via inject_message) is the signature message.
    */
   TBOTRManager *OTRManager = [TBOTRManager sharedOTRManager];
@@ -494,12 +494,12 @@ static void handle_msg_event_cb(void *opdata, OtrlMessageEvent msg_event,
    PurpleConversation *conv = NULL;
    gchar *buf;
    OtrlMessageEvent * last_msg_event;
-   
+
    if (!context) return;
-   
+
    conv = otrg_plugin_context_to_conv(context, 1);
    last_msg_event = g_hash_table_lookup(conv->data, "otr-last_msg_event");
-   
+
    switch (msg_event)
    {
    case OTRL_MSGEVENT_NONE:
@@ -552,7 +552,7 @@ static void handle_msg_event_cb(void *opdata, OtrlMessageEvent msg_event,
    "conversation: %s"), gcry_strerror(err));
    break;
    }
-   
+
    display_otr_message_or_notify(opdata, context->accountname,
    context->protocol, context->username, buf, 1,
    OTRL_NOTIFY_ERROR, _("OTR Error"), buf, NULL);
@@ -653,7 +653,7 @@ static void handle_msg_event_cb(void *opdata, OtrlMessageEvent msg_event,
    g_free(buf);
    break;
    }
-   
+
    *last_msg_event = msg_event;
    */
 }
@@ -669,7 +669,7 @@ static void create_instag_cb(void *opdata, const char *accountname, const char *
   instagf = fopen([isntanceTagPath UTF8String], "w+b");
   otrl_instag_generate_FILEp(otr_userstate, instagf, accountname, protocol);
   fclose(instagf);
-  
+
   NSLog(@"create_instag_cb for %@, %@",
         [NSString stringWithUTF8String:accountname], [NSString stringWithUTF8String:protocol]);
 }
@@ -734,13 +734,13 @@ static void convert_data_free_cb(void *opdata, ConnContext *context, char *dest)
  */
 static void timer_control_cb(void *opdata, unsigned int interval) {
   NSLog(@"timer_control_cb with interval : %d", interval);
-  
+
   TBOTRManager *otrManager = [TBOTRManager sharedOTRManager];
   if (otrManager.pollTimer!=nil) {
     [otrManager.pollTimer invalidate];
     otrManager.pollTimer = nil;
   }
-  
+
   if (interval > 0) {
     NSLog(@"timer_control_cb. setting a new timer : %d", interval);
     otrManager.pollTimer = [NSTimer scheduledTimerWithTimeInterval:interval
@@ -788,7 +788,7 @@ static OtrlMessageAppOps ui_ops = {
   if (sharedOTRManager==nil) {
     sharedOTRManager = [[self alloc] init];
   }
-  
+
   return sharedOTRManager;
 }
 
@@ -799,12 +799,12 @@ static OtrlMessageAppOps ui_ops = {
     _nextMessageIsSignatureMessage = NO;
     _bgQueue = dispatch_queue_create([@"TBOTRManager bgQueue" UTF8String], DISPATCH_QUEUE_SERIAL);
     _isGeneratingPrivateKey = NO;
-    
+
     // init otr lib
     OTRL_INIT;
     otr_userstate = otrl_userstate_create();
   }
-  
+
   return self;
 }
 
@@ -814,21 +814,21 @@ static OtrlMessageAppOps ui_ops = {
   NSFileManager *fileManager = [NSFileManager defaultManager];
   [fileManager removeItemAtPath:[[self class] privateKeyPath]  error:nil];
   [fileManager removeItemAtPath:[[self class] instanceTagPath]  error:nil];
-    
+
   [self.pollTimer invalidate];
   self.pollTimer = nil;
-  
+
   self.bgQueue = nil;
-  
+
   if (self.isGeneratingPrivateKey) {
     otrl_privkey_generate_cancelled(otr_userstate, newkeyp);
   }
-  
+
   otrl_privkey_pending_forget_all(otr_userstate);
-  
+
   otrl_userstate_free(otr_userstate);
   otr_userstate = nil;
-  
+
   sharedOTRManager = nil;
 }
 
@@ -841,13 +841,13 @@ static OtrlMessageAppOps ui_ops = {
 - (NSString *)queryMessageForAccount:(NSString *)account {
   // Note that we pass a name for display, not internal usage
 	char *msg = otrl_proto_default_query_msg([account UTF8String], OTRL_POLICY_DEFAULT);
-  
+
 	if (msg) {
     NSString *message = [NSString stringWithUTF8String:msg];
     free(msg);
     return message;
   }
-  
+
   return @"";
 }
 
@@ -857,14 +857,14 @@ static OtrlMessageAppOps ui_ops = {
                      completionBlock:(TBPrivateKeyCompletionBlock)completionBlock {
   const char *accountC = [account cStringUsingEncoding:NSUTF8StringEncoding];
   const char *protocolC = [protocol cStringUsingEncoding:NSUTF8StringEncoding];
-  
+
   NSLog(@"!!! was asked to generate a private key");
-  
+
   if (completionBlock!=NULL) {
     NSLog(@"!!! enqueuing the completion block");
     [self.pkCompletionBlocks addObject:completionBlock];
   }
-  
+
   // if the private key already exist, execute the completion blocks and return
   OtrlPrivKey *privateKey = otrl_privkey_find(otr_userstate, accountC, protocolC);
   if (privateKey) {
@@ -876,7 +876,7 @@ static OtrlMessageAppOps ui_ops = {
     self.pkCompletionBlocks = [NSMutableArray array];
     return;
   }
-  
+
   /* Begin a private key generation that will potentially take place in
    * a background thread.  This routine must be called from the main
    * thread.  It will set *newkeyp, which you can pass to
@@ -887,9 +887,9 @@ static OtrlMessageAppOps ui_ops = {
   //__block void *newkeyp;
   gcry_error_t generateError;
   generateError = otrl_privkey_generate_start(otr_userstate, accountC, protocolC, &newkeyp);
-  
+
   NSLog(@"!!! generateError : %d vs %d", generateError, gcry_error(GPG_ERR_EEXIST));
-  
+
   // key is already being generated : keep the ocmpletionBlock for later and return
   if (generateError==gcry_error(GPG_ERR_EEXIST)) {
     NSLog(@"!!! a private key is already being generated");
@@ -899,37 +899,37 @@ static OtrlMessageAppOps ui_ops = {
     }
     return;
   }
-  
+
   self.isGeneratingPrivateKey = YES;
 
   // generate the private key on the backgorund thread
   dispatch_async(self.bgQueue, ^{
     NSLog(@"!!! will generate the private key on %@ thread",
           ([NSThread isMainThread] ? @"main" : @"bg"));
-    
+
     /* Do the private key generation calculation.  You may call this from a
      * background thread.  When it completes, call
      * otrl_privkey_generate_finish from the _main_ thread. */
     otrl_privkey_generate_calculate(newkeyp);
-    
+
     NSLog(@"!!! private key calculated");
-    
+
     // on the main thread
     dispatch_sync(dispatch_get_main_queue(), ^{
       self.isGeneratingPrivateKey = NO;
       // if the OTRManager has been reset while generating the key, don't execute this
       if (self.bgQueue!=nil) {
         NSString *privateKeyPath = [[self class] privateKeyPath];
-        NSLog(@"!!! private key path : %@", privateKeyPath);
+        // NSLog(@"!!! private key path : %@", privateKeyPath);
         const char *privateKeyPathC = [privateKeyPath cStringUsingEncoding:NSUTF8StringEncoding];
-        
+
         /* Call this from the main thread only.  It will write the newly created
          * private key into the given file and store it in the OtrlUserState. */
         otrl_privkey_generate_finish(otr_userstate, newkeyp, privateKeyPathC);
-        
+
         NSLog(@"!!! finishing the private key generation on %@ thread",
               ([NSThread isMainThread] ? @"main" : @"bg"));
-        
+
         // exclude the private key from backup
         NSError *pkExcludeFromBackupError = nil;
         NSURL *privateKeyURL = [NSURL fileURLWithPath:privateKeyPath];
@@ -940,7 +940,7 @@ static OtrlMessageAppOps ui_ops = {
           NSLog(@"!!! Failed to exclude the private key from backup : %@",
                 pkExcludeFromBackupError);
         }
-        
+
         // set file protection
         NSError *pkFileProtectionError = nil;
         NSDictionary *attr = [NSDictionary dictionaryWithObject:NSFileProtectionComplete
@@ -951,7 +951,7 @@ static OtrlMessageAppOps ui_ops = {
         if (!pkFileProtectionOk) {
           NSLog(@"!!! Failed to set file protection on private key : %@", pkFileProtectionError);
         }
-        
+
         // execute the pending completion blocks
         NSLog(@"!!! executing the completion block, (%d) pending", [self.pkCompletionBlocks count]);
         for (TBPrivateKeyCompletionBlock aBlock in self.pkCompletionBlocks) {
@@ -981,7 +981,7 @@ static OtrlMessageAppOps ui_ops = {
                                             protocol:protocol];
      gcry_error_t err;
      char *newMessageC = NULL;
-     
+
      NSLog(@"-- will encode message from %@ to %@", accountName, recipient);
      err = otrl_message_sending(otr_userstate, &ui_ops, NULL,
                                 [accountName UTF8String], [protocol UTF8String],
@@ -991,19 +991,19 @@ static OtrlMessageAppOps ui_ops = {
      if (err!=GPG_ERR_NO_ERROR) {
        NSLog(@"!!!!! error while sending the message : %d", err);
      }
-     
+
      if (err==GPG_ERR_NO_ERROR && !newMessageC) {
        NSLog(@"!!!!! There was no error, but an OTR message could not be made.\
              perhaps you need to run some key authentication first...");
      }
-     
+
      NSString *newMessage = @"";
      if (newMessageC) {
        newMessage = [NSString stringWithUTF8String:newMessageC];
      }
-     
+
      otrl_message_free(newMessageC);
-     
+
      completionBlock(newMessage);
    }];
 }
@@ -1015,12 +1015,12 @@ static OtrlMessageAppOps ui_ops = {
                    protocol:(NSString *)protocol {
   if (![message length] || ![sender length] ||
       ![accountName length] || ![protocol length]) return @"";
-  
+
   char *newMessageC = NULL;
   ConnContext *context = [self contextForUsername:sender
                                       accountName:accountName
                                          protocol:protocol];
-  
+
   BOOL isInternalProtocolMsg = otrl_message_receiving(otr_userstate, &ui_ops, NULL,
                                                       [accountName UTF8String],
                                                       [protocol UTF8String],
@@ -1029,13 +1029,13 @@ static OtrlMessageAppOps ui_ops = {
                                                       &newMessageC, NULL,
                                                       &context, NULL, NULL);
   NSString *newMessage = @"";
-  
+
   //    if (context) {
   //      if (context->msgstate == OTRL_MSGSTATE_FINISHED) {
   //        [self disableEncryptionForUsername:recipient accountName:accountName protocol:protocol];
   //      }
   //    }
-  
+
   if (isInternalProtocolMsg) {
     NSLog(@"-- %@ was an internal protocol message", message);
   }
@@ -1050,7 +1050,7 @@ static OtrlMessageAppOps ui_ops = {
     }
   }
   otrl_message_free(newMessageC);
-  
+
   return newMessage;
 }
 
@@ -1075,7 +1075,7 @@ static OtrlMessageAppOps ui_ops = {
   if(context) {
     fingerprint = context->active_fingerprint;
   }
-  
+
   char their_hash[45];
   if(fingerprint && fingerprint->fingerprint) {
     otrl_privkey_hash_to_human(their_hash, fingerprint->fingerprint);
@@ -1094,7 +1094,7 @@ static OtrlMessageAppOps ui_ops = {
                                       accountName:accountName
                                          protocol:protocol];
   if (!context) return NO;
-  
+
   BOOL isEncrypted = NO;
   switch (context->msgstate) {
     case OTRL_MSGSTATE_ENCRYPTED:
@@ -1110,7 +1110,7 @@ static OtrlMessageAppOps ui_ops = {
       isEncrypted = NO;
       break;
   }
-  
+
   return isEncrypted;
 }
 
