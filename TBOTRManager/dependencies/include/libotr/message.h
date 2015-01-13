@@ -1,7 +1,8 @@
 /*
  *  Off-the-Record Messaging library
- *  Copyright (C) 2004-2012  Ian Goldberg, Rob Smits, Chris Alexander,
- *  			      Willy Lew, Lisa Du, Nikita Borisov
+ *  Copyright (C) 2004-2014  Ian Goldberg, David Goulet, Rob Smits,
+ *                           Chris Alexander, Willy Lew, Lisa Du,
+ *                           Nikita Borisov
  *                           <otr@cypherpunks.ca>
  *
  *  This library is free software; you can redistribute it and/or
@@ -230,7 +231,7 @@ typedef struct s_OtrlMessageAppOps {
      *      Received a general OTR error. The argument 'message' will
      *      also be passed and it will contain the OTR error message.
      * - OTRL_MSGEVENT_RCVDMSG_UNENCRYPTED
-     *      Received an unencrypted message. The argument 'smessage' will
+     *      Received an unencrypted message. The argument 'message' will
      *      also be passed and it will contain the plaintext message.
      * - OTRL_MSGEVENT_RCVDMSG_UNRECOGNIZED
      *      Cannot recognize the type of OTR message received.

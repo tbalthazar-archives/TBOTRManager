@@ -1,7 +1,8 @@
 /*
  *  Off-the-Record Messaging library
- *  Copyright (C) 2004-2012  Ian Goldberg, Chris Alexander, Willy Lew,
- *  			     Nikita Borisov
+ *  Copyright (C) 2004-2014  Ian Goldberg, David Goulet, Rob Smits,
+ *                           Chris Alexander, Willy Lew, Lisa Du,
+ *                           Nikita Borisov
  *                           <otr@cypherpunks.ca>
  *
  *  This library is free software; you can redistribute it and/or
@@ -21,6 +22,14 @@
 #ifndef __MEM_H__
 #define __MEM_H__
 
+#include <stdlib.h>
+
 void otrl_mem_init(void);
+
+/* Compare two memory blocks in time dependent on the length of the
+ * blocks, but not their contents.  Returns 1 if they differ, 0 if they
+ * are the same. */
+int otrl_mem_differ(const unsigned char *buf1, const unsigned char *buf2,
+    size_t len);
 
 #endif
