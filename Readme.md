@@ -1,4 +1,4 @@
-Work in progress, please do not use (yet).
+This library was the [OTR](https://otr.cypherpunks.ca/) implementation of the now retired [Cryptocat](https://crypto.cat) iOS app. It is no longer maintained.
 
 TBOTRManager is inspired by and uses code examples from [OTRKit](https://github.com/ChatSecure/OTRKit).  
 OTRKit is Copyright (c) 2012, Chris Ballinger <chris@chatsecure.org>. All rights reserved.
